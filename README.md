@@ -1,123 +1,110 @@
-# دليل تكامل الدفع
+# Project Documentation
 
-هذا الدليل يوضح كيفية إضافة طرق دفع جديدة إلى المشروع، بالإضافة إلى كيفية جعلها قابلة للتفعيل أو التعطيل مثل الإضافات الأخرى.
+## Creating a New Module: Blog Example
 
----
+The system is designed to support modular development. Follow these steps to create a new "Blog" module:
 
-## كيفية إضافة طريقة دفع جديدة
+### 1. Define the Blog Module
+Create a directory for the module and include the necessary files:
+- `app/Http/Controllers/BlogController.php`: Handles blog-related logic.
+- `resources/views/blog`: Contains Blade templates for the blog.
 
-لإضافة طريقة دفع جديدة، قم باتباع الخطوات التالية:
-
-### 1. **إضافة تعريف لطريقة الدفع في قاعدة البيانات**
-- تأكد من أن الجدول `payment` يحتوي على الأعمدة التالية:
-  - `user_id`: معرّف المستخدم الذي أنشأ طريقة الدفع.
-  - `payment_name`: اسم طريقة الدفع.
-  - `is_available`: لتحديد ما إذا كانت الطريقة متاحة.
-  - `is_active`: لتحديد إذا كانت الطريقة مفعّلة أم لا.
-  - `test_public_key` و `test_secret_key`: مفاتيح البيئة التجريبية.
-  - `live_public_key` و `live_secret_key`: مفاتيح البيئة الحية.
-  - `environment`: تحدد البيئة (تجريبية أو حية).
-
-### 2. **تحديث نموذج `Payment`**
-- يقع نموذج `Payment` في الملف `app/Models/Payment.php`. تأكد من أن الحقلين `is_available` و `is_active` مضافين في مصفوفة `fillable`.
-
-#### مثال:
+Example `BlogController`:
 ```php
-protected $fillable = [
-    'user_id',
-    'payment_name',
-    'is_available',
-    'is_active',
-    'test_public_key',
-    'test_secret_key',
-    'live_public_key',
-    'live_secret_key',
-    'environment'
-];
-```
+<?php
 
-### 3. **إدارة الإضافات عبر لوحة التحكم**
-- قم بتحديث `PaymentController` لإضافة وظائف تفعيل أو تعطيل طرق الدفع.
-- أضف واجهة إدارة في لوحة التحكم للسماح للمسؤول بتغيير حالة التفعيل (`is_active`).
+namespace App\Http\Controllers;
 
-#### مثال:
-```php
-public function toggleActivation(Request $request, $id)
+use Illuminate\Http\Request;
+
+class BlogController extends Controller
 {
-    $payment = Payment::find($id);
-    $payment->is_active = !$payment->is_active;
-    $payment->save();
-
-    return redirect()->back()->with('success', 'Payment method status updated successfully.');
-}
-```
-
-### 4. **تكامل الواجهة الأمامية**
-- قم بتحديث الواجهات الأمامية لإظهار طرق الدفع المتاحة فقط (`is_available = true` و `is_active = true`).
-
----
-
-## شرح نموذج `Payment`
-
-نموذج `Payment` يمثل طرق الدفع في النظام.
-
-### هيكل النموذج
-```php
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-
-class Payment extends Model
-{
-    protected $table = 'payment';
-    protected $fillable = [
-        'user_id',
-        'payment_name',
-        'is_available',
-        'is_active',
-        'test_public_key',
-        'test_secret_key',
-        'live_public_key',
-        'live_secret_key',
-        'environment'
-    ];
-}
-```
-
-### الحقول الرئيسية
-- **`is_active`**: يُحدد إذا ما كانت الطريقة مفعلة أم لا.
-- **`is_available`**: يُحدد إذا ما كانت الطريقة متاحة للمستخدمين.
-
----
-
-## شرح نموذج `AddonsGroup`
-
-نموذج `AddonsGroup` يمثل مجموعات الإضافات التي يمكن ربطها بالكائنات الأخرى في التطبيق.
-
-### هيكل النموذج
-```php
-namespace App\Models;
-
-use Illuminate\Database\Eloquent\Model;
-
-class AddonsGroup extends Model
-{
-    protected $table = 'addons_group';
-    protected $fillable = ['name', 'selection_type', 'selection_count', 'min_count', 'max_count'];
-
-    public function category()
+    public function index()
     {
-        return $this->hasOne('App\Models\Category', 'id', 'cat_id');
-    }
-
-    public function item()
-    {
-        return $this->hasOne('App\Models\Item', 'id', 'item_id');
+        // Fetch and return blog posts
+        return view('blog.index', [
+            'posts' => Blog::all()
+        ]);
     }
 }
 ```
 
-### الحقول الرئيسية
-- **`name`**: اسم مجموعة الإضافات.
-- **`selection_type`**: نوع الاختيار (مثل فردي أو متعدد).
-- **`selection_count`**: عدد الخيارات المسموح بها.
+### 2. Register Routes
+Add routes for the Blog module in `routes/web.php`:
+```php
+Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
+```
+
+### 3. Add Views
+Create the necessary views in `resources/views/blog`. Example `index.blade.php`:
+```blade
+@extends('layouts.app')
+
+@section('content')
+    <h1>Blog Posts</h1>
+    <ul>
+        @foreach($posts as $post)
+            <li>{{ $post->title }}</li>
+        @endforeach
+    </ul>
+@endsection
+```
+
+### 4. Register Module (Optional)
+If needed, register the Blog module dynamically similar to other add-ons:
+- Update the `SystemAddons` table with the module's `unique_identifier`, `version`, etc.
+- Add a `config.json` file to describe the module's metadata.
+
+---
+
+## Adding a Payment Method Module
+
+To add a new payment method (e.g., "PayPal") that dynamically appears in the admin panel's payment methods list, follow these steps:
+
+### 1. Create the Payment Integration
+Add the payment-specific logic in a new controller, e.g., `app/Http/Controllers/addons/PayPalController.php`:
+```php
+<?php
+
+namespace App\Http\Controllers\addons;
+
+use Illuminate\Http\Request;
+
+class PayPalController extends Controller
+{
+    public function processPayment(Request $request)
+    {
+        // PayPal payment processing logic
+    }
+}
+```
+
+### 2. Update the Payment Model
+Add the payment method to the `Payment` table in the database:
+- Ensure `is_available` and `is_activate` flags are set to `1`.
+
+### 3. Extend the Wallet Module
+Modify the WalletController (or ensure it's dynamic):
+- When fetching payment methods, the new method will automatically appear based on the `Payment` model query:
+```php
+$getpaymentmethods = Payment::select('id', 'payment_name', 'payment_type')
+    ->where('is_available', 1)
+    ->where('is_activate', 1)
+    ->get();
+```
+
+### 4. Add Configuration
+Include configurations for the payment method in `.env` or `config/payment.php`:
+```php
+PAYPAL_CLIENT_ID=your-client-id
+PAYPAL_SECRET=your-secret
+```
+
+### 5. Test the Integration
+Verify that the payment method appears in the admin panel and functions as expected.
+
+---
+
+## Conclusion
+
+This guide outlines the steps to create new modules and integrate new payment methods. For further customization, refer to the `SystemAddons` model and existing modules such as the Wallet module.

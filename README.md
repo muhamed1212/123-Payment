@@ -1,110 +1,92 @@
-# Project Documentation
+# Payment Integration
 
-## Creating a New Module: Blog Example
-
-The system is designed to support modular development. Follow these steps to create a new "Blog" module:
-
-### 1. Define the Blog Module
-Create a directory for the module and include the necessary files:
-- `app/Http/Controllers/BlogController.php`: Handles blog-related logic.
-- `resources/views/blog`: Contains Blade templates for the blog.
-
-Example `BlogController`:
-```php
-<?php
-
-namespace App\Http\Controllers;
-
-use Illuminate\Http\Request;
-
-class BlogController extends Controller
-{
-    public function index()
-    {
-        // Fetch and return blog posts
-        return view('blog.index', [
-            'posts' => Blog::all()
-        ]);
-    }
-}
-```
-
-### 2. Register Routes
-Add routes for the Blog module in `routes/web.php`:
-```php
-Route::get('/blog', [BlogController::class, 'index'])->name('blog.index');
-```
-
-### 3. Add Views
-Create the necessary views in `resources/views/blog`. Example `index.blade.php`:
-```blade
-@extends('layouts.app')
-
-@section('content')
-    <h1>Blog Posts</h1>
-    <ul>
-        @foreach($posts as $post)
-            <li>{{ $post->title }}</li>
-        @endforeach
-    </ul>
-@endsection
-```
-
-### 4. Register Module (Optional)
-If needed, register the Blog module dynamically similar to other add-ons:
-- Update the `SystemAddons` table with the module's `unique_identifier`, `version`, etc.
-- Add a `config.json` file to describe the module's metadata.
+## مقدمة
+هذا المشروع يدعم إضافة وإدارة طرق دفع متعددة لتلبية احتياجات المستخدمين. يمكنك من خلال هذا الدليل التعرف على كيفية إضافة طرق دفع جديدة، الشروط اللازمة لتفعيلها، وكيفية عرضها في الواجهة.
 
 ---
 
-## Adding a Payment Method Module
+## المتطلبات الأساسية
+1. **إعدادات قاعدة البيانات**:
+   - يجب أن تحتوي قاعدة البيانات على جدول `Payment` يتضمن الحقول التالية:
+     - `id`: رقم تعريف فريد.
+     - `payment_name`: اسم طريقة الدفع.
+     - `is_activate`: إذا كانت طريقة الدفع مفعّلة (1) أو غير مفعّلة (0).
+     - `is_available`: إذا كانت طريقة الدفع متاحة (1) أو غير متاحة (0).
+     - `public_key` و`secret_key`: المفاتيح اللازمة للتكامل.
+     - `currency`: العملة المدعومة.
 
-To add a new payment method (e.g., "PayPal") that dynamically appears in the admin panel's payment methods list, follow these steps:
-
-### 1. Create the Payment Integration
-Add the payment-specific logic in a new controller, e.g., `app/Http/Controllers/addons/PayPalController.php`:
-```php
-<?php
-
-namespace App\Http\Controllers\addons;
-
-use Illuminate\Http\Request;
-
-class PayPalController extends Controller
-{
-    public function processPayment(Request $request)
-    {
-        // PayPal payment processing logic
-    }
-}
-```
-
-### 2. Update the Payment Model
-Add the payment method to the `Payment` table in the database:
-- Ensure `is_available` and `is_activate` flags are set to `1`.
-
-### 3. Extend the Wallet Module
-Modify the WalletController (or ensure it's dynamic):
-- When fetching payment methods, the new method will automatically appear based on the `Payment` model query:
-```php
-$getpaymentmethods = Payment::select('id', 'payment_name', 'payment_type')
-    ->where('is_available', 1)
-    ->where('is_activate', 1)
-    ->get();
-```
-
-### 4. Add Configuration
-Include configurations for the payment method in `.env` or `config/payment.php`:
-```php
-PAYPAL_CLIENT_ID=your-client-id
-PAYPAL_SECRET=your-secret
-```
-
-### 5. Test the Integration
-Verify that the payment method appears in the admin panel and functions as expected.
+2. **إعداد بيئة العمل**:
+   - يجب التأكد من أن بيئة العمل (Environment) تدعم جميع المتطلبات التقنية مثل المفاتيح العامة والخاصة.
 
 ---
 
-## Conclusion
+## كيفية إضافة طريقة دفع جديدة
+1. **إضافة السجل إلى قاعدة البيانات**:
+   - أدخل البيانات الأساسية لطريقة الدفع في جدول `Payment`.
 
-This guide outlines the steps to create new modules and integrate new payment methods. For further customization, refer to the `SystemAddons` model and existing modules such as the Wallet module.
+2. **إعداد الكود في الخلفية (Backend)**:
+   - افتح الملف `PaymentController.php` وأضف الكود التالي لجلب طريقة الدفع:
+     ```php
+     $getpaymentmethods = Payment::select('id', 'payment_name', 'is_activate', 'is_available')
+         ->where('is_available', 1)
+         ->where('is_activate', 1)
+         ->get();
+     ```
+
+3. **عرض طريقة الدفع في الواجهة**:
+   - استخدم الكود التالي في ملف Blade `paymentmethodsview.blade.php`:
+     ```blade
+     @foreach ($getpaymentmethods as $payment)
+         <div class="payment-method">
+             <img src="{{ $payment->image }}" alt="{{ $payment->payment_name }}">
+             <p>{{ $payment->payment_name }}</p>
+         </div>
+     @endforeach
+     ```
+
+---
+
+## الشروط لتفعيل طريقة الدفع
+1. **أن تكون متاحة (`is_available = 1`)**:
+   - يجب أن تحمل القيمة `1` في قاعدة البيانات.
+
+2. **أن تكون مفعّلة (`is_activate = 1`)**:
+   - يجب التأكد من أن طريقة الدفع مفعّلة.
+
+3. **التحقق من العملة**:
+   - إذا كنت تريد تحديد طريقة الدفع لعملة معينة، أضف هذا الشرط:
+     ```php
+     ->where('currency', 'USD')
+     ```
+
+---
+
+## ترتيب طرق الدفع
+- يتم ترتيب طرق الدفع باستخدام الحقل `reorder_id`. قم بتحديث هذا الحقل لتغيير ترتيب العرض.
+
+---
+
+## أمثلة على الشروط الإضافية
+- **تحديد البيئة (اختبار/إنتاج)**:
+  ```php
+  ->where('environment', 'production')
+  ```
+
+- **استبعاد طرق دفع معينة**:
+  ```php
+  ->where('payment_name', '!=', 'Wallet')
+  ```
+
+---
+
+## الأسئلة الشائعة
+### 1. كيف أضيف طريقة دفع جديدة؟
+اتبع الخطوات المذكورة أعلاه لإضافة السجل في قاعدة البيانات، وضمان إدراجها في الكود الخلفي والواجهة.
+
+### 2. كيف أتحقق من تفعيل طريقة الدفع؟
+تأكد من أن قيمتي `is_available` و `is_activate` تحملان القيمة `1` في قاعدة البيانات.
+
+### 3. كيف أغير ترتيب طرق الدفع؟
+قم بتحديث الحقل `reorder_id` للسجلات في جدول `Payment`.
+
+---

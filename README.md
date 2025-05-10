@@ -1,46 +1,68 @@
-#  Payment Integration Guide
+# Payment Integration Guide
 
-This repository provides a framework for managing payment methods and addons groups in a Laravel application. Below, you'll find a guide to understanding and extending the payment methods functionality.
-
----
-
-## How to Add a New Payment Method
-
-To add a new payment method, follow these steps:
-
-1. **Define the Payment in the Database**:
-   - Add an entry to the `payment` table with the following fields:
-     - `user_id`: ID of the user creating the payment method.
-     - `payment_name`: Name of the payment method.
-     - `is_available`: Whether this payment method is available.
-     - `test_public_key`, `test_secret_key`: Keys for testing the payment gateway.
-     - `live_public_key`, `live_secret_key`: Keys for live transactions.
-     - `environment`: The current environment (`test` or `live`).
-
-2. **Edit the `Payment` Model**:
-   - The `Payment` model is defined in `app/Models/Payment.php`. Ensure the `fillable` array includes all necessary fields for your new payment method.
-
-3. **Implement the Logic in the Controller**:
-   - Update the `PaymentController` to handle CRUD operations for the new payment method. For example:
-     - Define how to retrieve, update, and reorder the payments.
-     - Specify logic for handling keys and environment configurations.
-
-4. **Add Frontend Integration**:
-   - Update the frontend views to display the new payment method and provide options for users to configure it.
-
-5. **Test the Integration**:
-   - Use the provided test keys to ensure the payment works correctly in test mode before switching to live mode.
+هذا الدليل يوضح كيفية إضافة طرق دفع جديدة إلى المشروع، بالإضافة إلى كيفية جعلها قابلة للتفعيل أو التعطيل مثل الإضافات الأخرى.
 
 ---
 
-## Payment Model
+## كيفية إضافة طريقة دفع جديدة
 
-The `Payment` model is located at `app/Models/Payment.php`. It represents the payment methods in the application.
+لإضافة طريقة دفع جديدة، قم باتباع الخطوات التالية:
 
-### Structure
+### 1. **إضافة تعريف لطريقة الدفع في قاعدة البيانات**
+- تأكد من أن الجدول `payment` يحتوي على الأعمدة التالية:
+  - `user_id`: معرّف المستخدم الذي أنشأ طريقة الدفع.
+  - `payment_name`: اسم طريقة الدفع.
+  - `is_available`: لتحديد ما إذا كانت الطريقة متاحة.
+  - `is_active`: لتحديد إذا كانت الطريقة مفعّلة أم لا.
+  - `test_public_key` و `test_secret_key`: مفاتيح البيئة التجريبية.
+  - `live_public_key` و `live_secret_key`: مفاتيح البيئة الحية.
+  - `environment`: تحدد البيئة (تجريبية أو حية).
+
+### 2. **تحديث نموذج `Payment`**
+- يقع نموذج `Payment` في الملف `app/Models/Payment.php`. تأكد من أن الحقلين `is_available` و `is_active` مضافين في مصفوفة `fillable`.
+
+#### مثال:
 ```php
-<?php
+protected $fillable = [
+    'user_id',
+    'payment_name',
+    'is_available',
+    'is_active',
+    'test_public_key',
+    'test_secret_key',
+    'live_public_key',
+    'live_secret_key',
+    'environment'
+];
+```
 
+### 3. **إدارة الإضافات عبر لوحة التحكم**
+- قم بتحديث `PaymentController` لإضافة وظائف تفعيل أو تعطيل طرق الدفع.
+- أضف واجهة إدارة في لوحة التحكم للسماح للمسؤول بتغيير حالة التفعيل (`is_active`).
+
+#### مثال:
+```php
+public function toggleActivation(Request $request, $id)
+{
+    $payment = Payment::find($id);
+    $payment->is_active = !$payment->is_active;
+    $payment->save();
+
+    return redirect()->back()->with('success', 'Payment method status updated successfully.');
+}
+```
+
+### 4. **تكامل الواجهة الأمامية**
+- قم بتحديث الواجهات الأمامية لإظهار طرق الدفع المتاحة فقط (`is_available = true` و `is_active = true`).
+
+---
+
+## شرح نموذج `Payment`
+
+نموذج `Payment` يمثل طرق الدفع في النظام.
+
+### هيكل النموذج
+```php
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -52,6 +74,7 @@ class Payment extends Model
         'user_id',
         'payment_name',
         'is_available',
+        'is_active',
         'test_public_key',
         'test_secret_key',
         'live_public_key',
@@ -61,24 +84,18 @@ class Payment extends Model
 }
 ```
 
-### Explanation
-- `user_id`: The ID of the associated user.
-- `payment_name`: Name of the payment method.
-- `is_available`: Indicates if the payment method is active.
-- `test_public_key`, `test_secret_key`: Keys for the test environment.
-- `live_public_key`, `live_secret_key`: Keys for the live environment.
-- `environment`: Specifies whether the method is in `test` or `live` mode.
+### الحقول الرئيسية
+- **`is_active`**: يُحدد إذا ما كانت الطريقة مفعلة أم لا.
+- **`is_available`**: يُحدد إذا ما كانت الطريقة متاحة للمستخدمين.
 
 ---
 
-## AddonsGroup Model
+## شرح نموذج `AddonsGroup`
 
-The `AddonsGroup` model is located at `app/Models/AddonsGroup.php`. It represents groups of addons that can be associated with other entities in the application.
+نموذج `AddonsGroup` يمثل مجموعات الإضافات التي يمكن ربطها بالكائنات الأخرى في التطبيق.
 
-### Structure
+### هيكل النموذج
 ```php
-<?php
-
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
@@ -100,10 +117,7 @@ class AddonsGroup extends Model
 }
 ```
 
-### Explanation
-- `name`: Name of the addons group.
-- `selection_type`: Type of selection allowed (e.g., single or multiple).
-- `selection_count`: Number of selections allowed.
-- `min_count`, `max_count`: Minimum and maximum selections allowed.
-- `category()`: Relationship to the `Category` model.
-- `item()`: Relationship to the `Item` model.
+### الحقول الرئيسية
+- **`name`**: اسم مجموعة الإضافات.
+- **`selection_type`**: نوع الاختيار (مثل فردي أو متعدد).
+- **`selection_count`**: عدد الخيارات المسموح بها.

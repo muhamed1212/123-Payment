@@ -1,4 +1,4 @@
-# Rege Payment Integration Guide
+#  Payment Integration Guide
 
 This repository provides a framework for managing payment methods and addons groups in a Laravel application. Below, you'll find a guide to understanding and extending the payment methods functionality.
 

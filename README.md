@@ -1,160 +1,96 @@
-# Payment Integration
+# دليل إعداد وإدارة طرق الدفع كموديولات مستقلة في المشروع
 
 ## مقدمة
-هذا المشروع يدعم إضافة وإدارة طرق دفع متعددة لتلبية احتياجات المستخدمين. يمكنك من خلال هذا الدليل التعرف على كيفية إضافة طرق دفع جديدة، الشروط اللازمة لتفعيلها، وكيفية عرضها في الواجهة.
+يدعم هذا المشروع نظامًا مرنًا لإدارة طرق الدفع على هيئة إضافات (Modules). يمكن للمبرمج إضافة طريقة دفع جديدة بسهولة مع إمكانية تفعيلها أو تعطيلها من خلال لوحة التحكم. يهدف هذا الدليل إلى شرح الخطوات العملية لإنشاء إضافة جديدة لطرق الدفع وإعدادها لتكون قابلة للتفعيل أو الإيقاف.
 
 ---
 
 ## المتطلبات الأساسية
-1. **إعدادات قاعدة البيانات**:
-   - يجب أن تحتوي قاعدة البيانات على جدول `Payment` يتضمن الحقول التالية:
-     - `id`: رقم تعريف فريد.
-     - `payment_name`: اسم طريقة الدفع.
-     - `is_activate`: إذا كانت طريقة الدفع مفعّلة (1) أو غير مفعّلة (0).
-     - `is_available`: إذا كانت طريقة الدفع متاحة (1) أو غير متاحة (0).
-     - `public_key` و`secret_key`: المفاتيح اللازمة للتكامل.
+1. **إعداد قاعدة البيانات**:
+   - يجب أن يحتوي جدول `Payment` (أو أي جدول مخصص للإضافات) على الحقول التالية:
+     - `id`: رقم تعريف فريد للإضافة.
+     - `payment_name`: اسم الإضافة (مثل: PayPal).
+     - `unique_identifier`: معرف فريد للإضافة (مثل: `paypal`).
+     - `is_activate`: إذا كانت الإضافة مفعّلة (1) أو معطلة (0).
+     - `is_available`: إذا كانت الإضافة متاحة (1) أو غير متاحة (0).
+     - `public_key` و`secret_key`: المفاتيح الخاصة بعملية الدفع.
      - `currency`: العملة المدعومة.
 
-2. **إعداد بيئة العمل**:
-   - يجب التأكد من أن بيئة العمل (Environment) تدعم جميع المتطلبات التقنية مثل المفاتيح العامة والخاصة.
+2. **إنشاء هيكل الموديولات**:
+   - يجب أن يتم إنشاء كل إضافة جديدة داخل المسار `app/Http/Controllers/addons`.
+   - يتم استخدام ملفات مخصصة لكل إضافة مثل `PayPalController.php`.
+
+3. **إعداد واجهة المستخدم**:
+   - يجب توفير واجهة لإعداد وتفعيل/تعطيل الإضافة في لوحة التحكم.
 
 ---
 
-## المسارات الهامة
+## خطوات إنشاء إضافة جديدة
 
-### 1. **`PaymentController.php`**
-   - الموقع: `app/Http/Controllers/admin/PaymentController.php`
-   - الوظيفة: إدارة طرق الدفع من لوحة التحكم.
-   - الأكواد الهامة:
-     ```php
-     $getpaymentmethods = Payment::select('id', 'payment_name', 'is_activate', 'is_available')
-         ->where('is_available', 1)
-         ->where('is_activate', 1)
-         ->get();
+### الخطوة 1: إعداد قاعدة البيانات
+1. **إضافة سجل جديد في جدول `Payment`**:
+   - استخدم SQL أو نموذجًا لتحديث السجل. مثال:
+     ```sql
+     INSERT INTO Payment (payment_name, unique_identifier, is_activate, is_available, public_key, secret_key, currency)
+     VALUES ('PayPal', 'paypal', 1, 1, 'your_public_key', 'your_secret_key', 'USD');
      ```
 
-### 2. **`CheckoutController.php`**
-   - الموقع: `app/Http/Controllers/front/CheckoutController.php`
-   - الوظيفة: إدارة عملية الدفع أثناء الشراء.
-   - الأكواد الهامة:
-     ```php
-     if (Session::get('payment_type') == "13") {
-         $checkstatus = app('App\\Http\\Controllers\\addons\\MollieController')->checkpaymentstatus(Session::get('tran_ref'));
-         if ($checkstatus == "A") {
-             $paymentId = Session::get('tran_ref');
-             $response = ['status' => 1, 'msg' => 'paid', 'paymentId' => $paymentId];
-         }
-     }
-     ```
-
-### 3. **`payment.blade.php`**
-   - الموقع: `resources/views/admin/payment/payment.blade.php`
-   - الوظيفة: عرض واجهة إدارة طرق الدفع في لوحة التحكم.
-   - الأكواد الهامة:
-     ```blade
-     <label class="form-label">
-         {{ trans('labels.payment_name') }} <span class="text-danger">*</span> 
-     </label>
-     <input type="text" class="form-control" name="name" placeholder="{{ trans('labels.payment_name') }}" required>
-     ```
-
-### 4. **`paymentmethodsview.blade.php`**
-   - الموقع: `resources/views/web/paymentmethodsview.blade.php`
-   - الوظيفة: عرض طرق الدفع في صفحة الواجهة الأمامية.
-   - الأكواد الهامة:
-     ```blade
-     @foreach ($getpaymentmethods as $payment)
-         <div class="payment-method">
-             <img src="{{ $payment->image }}" alt="{{ $payment->payment_name }}">
-             <p>{{ $payment->payment_name }}</p>
-         </div>
-     @endforeach
-     ```
-
-### 5. **`WalletController.php`**
-   - الموقع: `app/Http/Controllers/front/WalletController.php`
-   - الوظيفة: إدارة محفظة المستخدم وطرق الدفع المرتبطة بها.
-   - الأكواد الهامة:
-     ```php
-     $checkstatus = app('App\\Http\\Controllers\\addons\\PayTabController')->checkpaymentstatus(Session::get('tran_ref'));
-     if ($checkstatus == "A") {
-         $paymentId = Session::get('tran_ref');
-         $response = ['status' => '1', 'msg' => 'paid', 'transaction_id' => $paymentId];
-     }
-     ```
+2. **تحديث الحقول حسب احتياجات الإضافة**:
+   - تأكد من أن الحقول `is_activate` و`is_available` تحمل القيم الصحيحة.
 
 ---
 
-## كيفية إضافة طريقة دفع جديدة
-1. **إضافة السجل إلى قاعدة البيانات**:
-   - أدخل البيانات الأساسية لطريقة الدفع في جدول `Payment`.
+### الخطوة 2: إنشاء ملف التحكم (Controller)
+1. **إنشاء ملف جديد داخل مسار الإضافات**:
+   - المسار: `app/Http/Controllers/addons/PayPalController.php`.
 
-2. **إعداد الكود في الخلفية (Backend)**:
-   - افتح الملف `PaymentController.php` وأضف الكود التالي لجلب طريقة الدفع:
-     ```php
-     $getpaymentmethods = Payment::select('id', 'payment_name', 'is_activate', 'is_available')
-         ->where('is_available', 1)
-         ->where('is_activate', 1)
-         ->get();
-     ```
+2. **إعداد الكود الأساسي للإضافة**:
+   ```php name=app/Http/Controllers/addons/PayPalController.php
+   <?php
 
-3. **عرض طريقة الدفع في الواجهة**:
-   - استخدم الكود التالي في ملف Blade `paymentmethodsview.blade.php`:
-     ```blade
-     @foreach ($getpaymentmethods as $payment)
-         <div class="payment-method">
-             <img src="{{ $payment->image }}" alt="{{ $payment->payment_name }}">
-             <p>{{ $payment->payment_name }}</p>
-         </div>
-     @endforeach
-     ```
+   namespace App\Http\Controllers\addons;
 
----
+   use Illuminate\Http\Request;
 
-## الشروط لتفعيل طريقة الدفع
-1. **أن تكون متاحة (`is_available = 1`)**:
-   - يجب أن تحمل القيمة `1` في قاعدة البيانات.
+   class PayPalController
+   {
+       public function processPayment(Request $request)
+       {
+           // منطق معالجة الدفع
+           $response = $this->makePayment($request->all());
 
-2. **أن تكون مفعّلة (`is_activate = 1`)**:
-   - يجب التأكد من أن طريقة الدفع مفعّلة.
+           if ($response['status'] === 'success') {
+               return redirect()->route('payment.success');
+           }
 
-3. **التحقق من العملة**:
-   - إذا كنت تريد تحديد طريقة الدفع لعملة معينة، أضف هذا الشرط:
-     ```php
-     ->where('currency', 'USD')
-     ```
+           return redirect()->route('payment.fail');
+       }
+
+       private function makePayment($data)
+       {
+           // قم بإضافة منطق التكامل مع PayPal API هنا
+           return ['status' => 'success', 'transaction_id' => '12345'];
+       }
+   }
+   ```
 
 ---
 
-## ترتيب طرق الدفع
-- يتم ترتيب طرق الدفع باستخدام الحقل `reorder_id`. قم بتحديث هذا الحقل لتغيير ترتيب العرض.
+### الخطوة 3: إعداد واجهة لوحة التحكم
+1. **إنشاء ملف Blade جديد للإعدادات**:
+   - المسار: `resources/views/admin/payment/paypal.blade.php`.
 
----
-
-## أمثلة على الشروط الإضافية
-- **تحديد البيئة (اختبار/إنتاج)**:
-  ```php
-  ->where('environment', 'production')
-  ```
-
-- **استبعاد طرق دفع معينة**:
-  ```php
-  ->where('payment_name', '!=', 'Wallet')
-  ```
-
----
-
-## الأسئلة الشائعة
-### 1. كيف أضيف طريقة دفع جديدة؟
-اتبع الخطوات المذكورة أعلاه لإضافة السجل في قاعدة البيانات، وضمان إدراجها في الكود الخلفي والواجهة.
-
-### 2. كيف أتحقق من تفعيل طريقة الدفع؟
-تأكد من أن قيمتي `is_available` و `is_activate` تحملان القيمة `1` في قاعدة البيانات.
-
-### 3. كيف أغير ترتيب طرق الدفع؟
-قم بتحديث الحقل `reorder_id` للسجلات في جدول `Payment`.
-
----
-
-## المساهمة
-إذا كنت ترغب في المساهمة في المشروع أو تحسين الشيفرة، يرجى فتح طلب سحب (Pull Request) أو الإبلاغ عن المشاكل في قسم القضايا (Issues).
+2. **إعداد نموذج الإدخال**:
+   ````blade name=resources/views/admin/payment/paypal.blade.php
+   <form action="{{ route('admin.payment.update', ['id' => $paymentId]) }}" method="POST">
+       @csrf
+       <div class="form-group">
+           <label for="public_key">Public Key</label>
+           <input type="text" name="public_key" class="form-control" value="{{ $payment->public_key }}" required>
+       </div>
+       <div class="form-group">
+           <label for="secret_key">Secret Key</label>
+           <input type="text" name="secret_key" class="form-control" value="{{ $payment->secret_key }}" required>
+       </div>
+       <button type="submit" class="btn btn-primary">Save</button>
+   </form>

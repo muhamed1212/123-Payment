@@ -1,96 +1,122 @@
-# دليل إعداد وإدارة طرق الدفع كموديولات مستقلة في المشروع
+# Rege Payment Integration Guide
 
-## مقدمة
-يدعم هذا المشروع نظامًا مرنًا لإدارة طرق الدفع على هيئة إضافات (Modules). يمكن إضافة طريقة دفع جديدة بسهولة مع إمكانية تفعيلها أو تعطيلها من خلال لوحة التحكم. يهدف هذا الدليل إلى شرح الخطوات العملية لإنشاء إضافة جديدة لطرق الدفع وإعدادها لتكون قابلة للتفعيل أو الإيقاف.
-
----
-
-## المتطلبات الأساسية
-1. **إعداد قاعدة البيانات**:
-   - يحتوي جدول `Payment على الحقول التالية:
-     - `id`: رقم تعريف فريد للإضافة.
-     - `payment_name`: اسم الإضافة (مثل: PayPal).
-     - `unique_identifier`: معرف فريد للإضافة (مثل: `paypal`).
-     - `is_activate`: إذا كانت الإضافة مفعّلة (1) أو معطلة (0).
-     - `is_available`: إذا كانت الإضافة متاحة (1) أو غير متاحة (0).
-     - `public_key` و`secret_key`: المفاتيح الخاصة بعملية الدفع.
-     - `currency`: العملة المدعومة.
-
-2. **إنشاء هيكل الموديولات**:
-   - يجب أن يتم إنشاء كل إضافة جديدة داخل المسار `app/Http/Controllers/addons`.
-   - يتم استخدام ملفات مخصصة لكل إضافة مثل `PayPalController.php`.
-
-3. **إعداد واجهة المستخدم**:
-   - يجب توفير واجهة لإعداد وتفعيل/تعطيل الإضافة في لوحة التحكم.
+This repository provides a framework for managing payment methods and addons groups in a Laravel application. Below, you'll find a guide to understanding and extending the payment methods functionality.
 
 ---
 
-## خطوات إنشاء إضافة جديدة
+## How to Add a New Payment Method
 
-### الخطوة 1: إعداد قاعدة البيانات
-1. **إضافة سجل جديد في جدول `Payment`**:
-   - استخدم SQL أو نموذجًا لتحديث السجل. مثال:
-     ```sql
-     INSERT INTO Payment (payment_name, unique_identifier, is_activate, is_available, public_key, secret_key, currency)
-     VALUES ('PayPal', 'paypal', 1, 1, 'your_public_key', 'your_secret_key', 'USD');
-     ```
+To add a new payment method, follow these steps:
 
-2. **تحديث الحقول حسب احتياجات الإضافة**:
-   - تأكد من أن الحقول `is_activate` و`is_available` تحمل القيم الصحيحة.
+1. **Define the Payment in the Database**:
+   - Add an entry to the `payment` table with the following fields:
+     - `user_id`: ID of the user creating the payment method.
+     - `payment_name`: Name of the payment method.
+     - `is_available`: Whether this payment method is available.
+     - `test_public_key`, `test_secret_key`: Keys for testing the payment gateway.
+     - `live_public_key`, `live_secret_key`: Keys for live transactions.
+     - `environment`: The current environment (`test` or `live`).
 
----
+2. **Edit the `Payment` Model**:
+   - The `Payment` model is defined in `app/Models/Payment.php`. Ensure the `fillable` array includes all necessary fields for your new payment method.
 
-### الخطوة 2: إنشاء ملف التحكم (Controller)
-1. **إنشاء ملف جديد داخل مسار الإضافات**:
-   - المسار: `app/Http/Controllers/addons/PayPalController.php`.
+3. **Implement the Logic in the Controller**:
+   - Update the `PaymentController` to handle CRUD operations for the new payment method. For example:
+     - Define how to retrieve, update, and reorder the payments.
+     - Specify logic for handling keys and environment configurations.
 
-2. **إعداد الكود الأساسي للإضافة**:
-   ```php name=app/Http/Controllers/addons/PayPalController.php
-   <?php
+4. **Add Frontend Integration**:
+   - Update the frontend views to display the new payment method and provide options for users to configure it.
 
-   namespace App\Http\Controllers\addons;
-
-   use Illuminate\Http\Request;
-
-   class PayPalController
-   {
-       public function processPayment(Request $request)
-       {
-           // منطق معالجة الدفع
-           $response = $this->makePayment($request->all());
-
-           if ($response['status'] === 'success') {
-               return redirect()->route('payment.success');
-           }
-
-           return redirect()->route('payment.fail');
-       }
-
-       private function makePayment($data)
-       {
-           // قم بإضافة منطق التكامل مع PayPal API هنا
-           return ['status' => 'success', 'transaction_id' => '12345'];
-       }
-   }
-   ```
+5. **Test the Integration**:
+   - Use the provided test keys to ensure the payment works correctly in test mode before switching to live mode.
 
 ---
 
-### الخطوة 3: إعداد واجهة لوحة التحكم
-1. **إنشاء ملف Blade جديد للإعدادات**:
-   - المسار: `resources/views/admin/payment/paypal.blade.php`.
+## Payment Model
 
-2. **إعداد نموذج الإدخال**:
-   ````blade name=resources/views/admin/payment/paypal.blade.php
-   <form action="{{ route('admin.payment.update', ['id' => $paymentId]) }}" method="POST">
-       @csrf
-       <div class="form-group">
-           <label for="public_key">Public Key</label>
-           <input type="text" name="public_key" class="form-control" value="{{ $payment->public_key }}" required>
-       </div>
-       <div class="form-group">
-           <label for="secret_key">Secret Key</label>
-           <input type="text" name="secret_key" class="form-control" value="{{ $payment->secret_key }}" required>
-       </div>
-       <button type="submit" class="btn btn-primary">Save</button>
-   </form>
+The `Payment` model is located at `app/Models/Payment.php`. It represents the payment methods in the application.
+
+### Structure
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class Payment extends Model
+{
+    protected $table = 'payment';
+    protected $fillable = [
+        'user_id',
+        'payment_name',
+        'is_available',
+        'test_public_key',
+        'test_secret_key',
+        'live_public_key',
+        'live_secret_key',
+        'environment'
+    ];
+}
+```
+
+### Explanation
+- `user_id`: The ID of the associated user.
+- `payment_name`: Name of the payment method.
+- `is_available`: Indicates if the payment method is active.
+- `test_public_key`, `test_secret_key`: Keys for the test environment.
+- `live_public_key`, `live_secret_key`: Keys for the live environment.
+- `environment`: Specifies whether the method is in `test` or `live` mode.
+
+---
+
+## AddonsGroup Model
+
+The `AddonsGroup` model is located at `app/Models/AddonsGroup.php`. It represents groups of addons that can be associated with other entities in the application.
+
+### Structure
+```php
+<?php
+
+namespace App\Models;
+
+use Illuminate\Database\Eloquent\Model;
+
+class AddonsGroup extends Model
+{
+    protected $table = 'addons_group';
+    protected $fillable = ['name', 'selection_type', 'selection_count', 'min_count', 'max_count'];
+
+    public function category()
+    {
+        return $this->hasOne('App\Models\Category', 'id', 'cat_id');
+    }
+
+    public function item()
+    {
+        return $this->hasOne('App\Models\Item', 'id', 'item_id');
+    }
+}
+```
+
+### Explanation
+- `name`: Name of the addons group.
+- `selection_type`: Type of selection allowed (e.g., single or multiple).
+- `selection_count`: Number of selections allowed.
+- `min_count`, `max_count`: Minimum and maximum selections allowed.
+- `category()`: Relationship to the `Category` model.
+- `item()`: Relationship to the `Item` model.
+
+---
+
+## Contribution Guidelines
+
+1. Fork and clone the repository.
+2. Create a new branch for your feature or bugfix.
+3. Commit your changes and push them to your fork.
+4. Submit a pull request with a detailed explanation of your changes.
+
+For more information, visit the [repository documentation](https://github.com/m-elesawy/rege).
+
+---
